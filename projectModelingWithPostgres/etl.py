@@ -6,6 +6,13 @@ from sql_queries import *
 
 
 def process_song_file(cur, filepath):
+    """
+    This function will process a song file and will store data into songs and 
+    artists tables
+    Parameters:
+        cur (cursor): psycopg2 cursor connection to postgres
+        filepath (string): song file path
+    """
     # open song file
     df = pd.read_json(filepath,lines=True)
    
@@ -20,6 +27,13 @@ def process_song_file(cur, filepath):
 
 
 def process_log_file(cur, filepath):
+    """
+    Function to process log files and store data into time, users and songplay
+    tables
+    Parameters:
+        cur (cursor): psycopg2 cursor connection to postgres
+        filepath (string): log file path
+    """
     # open log file
     df = pd.read_json(filepath,lines=True)
 
@@ -51,6 +65,7 @@ def process_log_file(cur, filepath):
         cur.execute(user_table_insert, row)
 
     # insert songplay records
+    df["ts"] = pd.to_datetime(df["ts"], unit="ms")
     for index, row in df.iterrows():
         
         # get songid and artistid from song and artist tables
@@ -62,12 +77,34 @@ def process_log_file(cur, filepath):
         else:
             songid, artistid = None, None
 
-        # insert songplay record
-        songplay_data = (pd.to_datetime(row.ts,unit='ms'),row.userId,row.level,songid,artistid,row.sessionId,row.location,row.userAgent)
-        cur.execute(songplay_table_insert, songplay_data)
+        
+        
+        # insert songplay record if songid and artistid exist
+        if songid is not None and artistid is not None:
+            songplay_data = (
+                row.ts,
+                row.userId,
+                row.level,
+                songid,
+                artistid,
+                row.sessionId,
+                row.location,
+                row.userAgent,
+            )
+            cur.execute(songplay_table_insert, songplay_data)
+    
 
 
 def process_data(cur, conn, filepath, func):
+    """
+    Function to process all the data set files and store data into the database
+    Parameters:
+        cur: psycopg2 cursor
+        conn: psycopg2 connection object
+        filepath (string): path where the data set files are located
+        func (function): function to execute (process_song_file or
+        process_log_file)
+    """
     # get all files matching extension from directory
     all_files = []
     for root, dirs, files in os.walk(filepath):
@@ -87,6 +124,7 @@ def process_data(cur, conn, filepath, func):
 
 
 def main():
+    """ Perform all the ETL process actions when script is executed """
     conn = psycopg2.connect("host=127.0.0.1 dbname=sparkifydb user=student password=student")
     cur = conn.cursor()
 
